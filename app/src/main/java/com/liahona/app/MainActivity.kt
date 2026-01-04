@@ -1,7 +1,9 @@
 package com.liahona.app
 
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.graphics.Color
+import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.webkit.WebResourceRequest
@@ -11,7 +13,6 @@ import android.webkit.WebViewClient
 import androidx.activity.addCallback
 import androidx.appcompat.app.AppCompatActivity
 import com.liahona.app.databinding.ActivityMainBinding
-import com.liahona.app.BuildConfig
 
 class MainActivity : AppCompatActivity() {
 
@@ -23,6 +24,8 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         configureWebView(binding.webview)
+        
+        // Enable debugging only in debug builds
         WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
 
         onBackPressedDispatcher.addCallback(this) {
@@ -43,7 +46,7 @@ class MainActivity : AppCompatActivity() {
             allowFileAccess = true
             allowContentAccess = true
             allowFileAccessFromFileURLs = true
-            mediaPlaybackRequiresUserGesture = true
+            mediaPlaybackRequiresUserGesture = false
             builtInZoomControls = false
             displayZoomControls = false
             cacheMode = WebSettings.LOAD_DEFAULT
@@ -55,9 +58,11 @@ class MainActivity : AppCompatActivity() {
         webView.isVerticalScrollBarEnabled = false
         webView.isHorizontalScrollBarEnabled = false
         webView.isHapticFeedbackEnabled = true
+        
+        // Disable long click context menu to feel more native
         webView.isLongClickable = false
         webView.setOnLongClickListener { true }
-        webView.setOnCreateContextMenuListener { _, _, _ -> }
+        
         webView.setBackgroundColor(Color.TRANSPARENT)
         webView.overScrollMode = View.OVER_SCROLL_NEVER
 
@@ -67,16 +72,25 @@ class MainActivity : AppCompatActivity() {
                 request: WebResourceRequest?
             ): Boolean {
                 val url = request?.url ?: return false
+
+                // 1. Allow internal file navigation (index.html etc)
                 if (url.scheme == "file") return false
 
-                val intent = Intent(Intent.ACTION_VIEW, url)
-                return if (intent.resolveActivity(packageManager) != null) {
+                // 2. Handle external links (gospellibrary:// or https://)
+                return try {
+                    val intent = Intent(Intent.ACTION_VIEW, url)
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     startActivity(intent)
-                    true
-                } else {
+                    true // We handled the link (opened external app)
+                } catch (e: Exception) {
+                    // 3. Link failed (e.g. Gospel Library not installed)
+                    // We return true to cancel the WebView navigation.
+                    // This is CRITICAL: It keeps the current page loaded so the 
+                    // JavaScript setTimeout() fallback can fire and try the HTTPS link instead.
                     true
                 }
             }
         }
     }
 }
+
