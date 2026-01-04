@@ -168,11 +168,44 @@ function openSelection() {
     const { b, c, v } = selection;
     const app = `gospellibrary://content/scriptures/bofm/${b.s}/${c}?verse=${v}#p${v}`;
     const web = `https://www.churchofjesuschrist.org/study/scriptures/bofm/${b.s}/${c}.${v}?lang=deu#p${v}`;
-    const start = Date.now();
-    window.location.href = app;
-    setTimeout(() => {
-        if (Date.now() - start < 1800) window.open(web, '_blank');
-    }, 1000);
+    const isAndroid = /Android/i.test(navigator.userAgent);
+
+    const openLink = (url) => {
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.rel = 'noreferrer noopener';
+        anchor.style.display = 'none';
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+    };
+
+    const tryIntentScheme = () => {
+        const intent = `intent://content/scriptures/bofm/${b.s}/${c}?verse=${v}#Intent;scheme=gospellibrary;package=org.lds.ldssa;S.browser_fallback_url=${encodeURIComponent(web)};end`;
+        openLink(intent);
+    };
+
+    let navigated = false;
+
+    const handleVisibilityChange = () => {
+        navigated = true;
+        clearTimeout(fallbackTimer);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+
+    const fallbackTimer = setTimeout(() => {
+        if (!navigated) {
+            openLink(web);
+        }
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }, 1200);
+
+    document.addEventListener('visibilitychange', handleVisibilityChange, { once: true });
+    if (isAndroid) {
+        tryIntentScheme();
+    } else {
+        openLink(app);
+    }
 }
 
 function resetOverlay() {
