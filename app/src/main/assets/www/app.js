@@ -4,27 +4,100 @@ import { BOM_EN } from './data/bom-en.js';
 import { OT_EN } from './data/ot-en.js';
 import { NT_EN } from './data/nt-en.js';
 
-const getDatabase = () => {
-    switch (APP_LANGUAGE_SET) {
-        case 'DE_ONLY':
-            return [...BOM_DE];
-        case 'EN_ONLY':
-            return [...BOM_EN, ...OT_EN, ...NT_EN];
-        case 'ALL':
-            return [...BOM_DE, ...BOM_EN, ...OT_EN, ...NT_EN];
-        default:
-            console.warn(`Unbekannter APP_LANGUAGE_SET: ${APP_LANGUAGE_SET}, verwende DE_ONLY als Fallback.`);
-            return [...BOM_DE];
+const TRANSLATIONS = {
+    de: {
+        app_title: "Liahona",
+        status_focus: "Fokussieren",
+        status_receiving: "Empfange...",
+        status_hold: "Länger fokussieren",
+        btn_read: "Lesen",
+        btn_reset: "Neue Stelle ziehen",
+        settings_title: "Einstellungen",
+        section_ui: "App Sprache",
+        section_content: "Inhalte wählen",
+        section_books: "Bücher",
+        section_languages: "Sprachen",
+        lang_de: "Deutsch",
+        lang_en: "Englisch",
+        book_bom: "Buch Mormon",
+        book_ot: "Altes Testament",
+        book_nt: "Neues Testament",
+        content_de: "Deutsch",
+        content_en: "Englisch",
+        btn_save: "Speichern",
+    },
+    en: {
+        app_title: "Liahona",
+        status_focus: "Focus",
+        status_receiving: "Receiving...",
+        status_hold: "Hold longer",
+        btn_read: "Read",
+        btn_reset: "Pull new verse",
+        settings_title: "Settings",
+        section_ui: "App Language",
+        section_content: "Select Content",
+        section_books: "Books",
+        section_languages: "Languages",
+        lang_de: "German",
+        lang_en: "English",
+        book_bom: "Book of Mormon",
+        book_ot: "Old Testament",
+        book_nt: "New Testament",
+        content_de: "German",
+        content_en: "English",
+        btn_save: "Save",
+    },
+};
+
+const statusMessages = {
+    focus: TRANSLATIONS.de.status_focus,
+    receiving: TRANSLATIONS.de.status_receiving,
+    hold: TRANSLATIONS.de.status_hold,
+};
+
+const SETTINGS_KEY = 'liahona_settings_v1';
+
+const defaultSettings = () => ({
+    uiLanguage: 'de',
+    content: {
+        books: {
+            bom: true,
+            ot: APP_LANGUAGE_SET !== 'DE_ONLY',
+            nt: APP_LANGUAGE_SET !== 'DE_ONLY',
+        },
+        languages: {
+            de: APP_LANGUAGE_SET !== 'EN_ONLY',
+            en: APP_LANGUAGE_SET !== 'DE_ONLY',
+        },
+    },
+});
+
+const loadSettings = () => {
+    try {
+        const stored = localStorage.getItem(SETTINGS_KEY);
+        if (!stored) return defaultSettings();
+        const parsed = JSON.parse(stored);
+        return {
+            ...defaultSettings(),
+            ...parsed,
+            content: {
+                ...defaultSettings().content,
+                ...(parsed?.content || {}),
+                books: { ...defaultSettings().content.books, ...(parsed?.content?.books || {}) },
+                languages: { ...defaultSettings().content.languages, ...(parsed?.content?.languages || {}) },
+            },
+        };
+    } catch (err) {
+        console.warn('Konnte Einstellungen nicht laden, verwende Standardwerte.', err);
+        return defaultSettings();
     }
 };
 
-const DB = getDatabase();
+const userSettings = loadSettings();
 
-const getLanguage = (book) => {
-    if (APP_LANGUAGE_SET === 'DE_ONLY') return 'deu';
-    if (APP_LANGUAGE_SET === 'EN_ONLY') return 'eng';
-    return BOM_DE.includes(book) ? 'deu' : 'eng';
-};
+let DB = [];
+
+const getLanguage = (book) => (BOM_DE.includes(book) ? 'deu' : 'eng');
 
 const canvas = document.getElementById('particle-canvas');
 const ctx = canvas.getContext('2d');
@@ -36,6 +109,20 @@ let moveIntensity = 0;
 const orb = document.getElementById('orb');
 const overlay = document.getElementById('result-overlay');
 const status = document.getElementById('status-text');
+const settingsOverlay = document.getElementById('settings-overlay');
+const settingsToggle = document.getElementById('settings-toggle');
+const settingsClose = document.getElementById('settings-close');
+const saveSettingsBtn = document.getElementById('btn-save-settings');
+const uiLanguageInputs = document.querySelectorAll('input[name="ui-language"]');
+const bookCheckboxes = {
+    bom: document.getElementById('book-bom'),
+    ot: document.getElementById('book-ot'),
+    nt: document.getElementById('book-nt'),
+};
+const languageCheckboxes = {
+    de: document.getElementById('lang-de'),
+    en: document.getElementById('lang-en'),
+};
 
 let start = 0;
 let distTotal = 0;
@@ -117,7 +204,7 @@ function onDown(event) {
     distTotal = 0;
     last = { x: point.clientX, y: point.clientY };
     document.body.classList.add('active-state');
-    status.innerText = 'Empfange...';
+    status.innerText = statusMessages.receiving;
     if (navigator.vibrate) navigator.vibrate(16);
     startVibrationLoop();
 }
@@ -150,9 +237,9 @@ function onUp() {
     orb.style.transform = 'translate(0, 0)';
 
     if (duration < 600) {
-        status.innerText = 'Länger fokussieren';
+        status.innerText = statusMessages.hold;
         setTimeout(() => {
-            if (!isHolding) status.innerText = 'Fokussieren';
+            if (!isHolding) status.innerText = statusMessages.focus;
         }, 1800);
         return;
     }
@@ -203,8 +290,93 @@ function openSelection() {
 
 function resetOverlay() {
     overlay.classList.remove('show');
-    status.innerText = 'Fokussieren';
+    status.innerText = statusMessages.focus;
     selection = null;
+}
+
+function updateUILanguage() {
+    const lang = TRANSLATIONS[userSettings.uiLanguage] ? userSettings.uiLanguage : 'de';
+    const dict = TRANSLATIONS[lang];
+
+    document.documentElement.lang = lang;
+    document.title = dict.app_title;
+    statusMessages.focus = dict.status_focus;
+    statusMessages.receiving = dict.status_receiving;
+    statusMessages.hold = dict.status_hold;
+
+    document.querySelectorAll('[data-i18n]').forEach((el) => {
+        const key = el.dataset.i18n;
+        if (dict[key]) el.innerText = dict[key];
+    });
+
+    if (!isHolding && !overlay.classList.contains('show')) {
+        status.innerText = statusMessages.focus;
+    }
+}
+
+function rebuildDatabase() {
+    const { books, languages } = userSettings.content;
+    const dbParts = [];
+
+    if (books.bom) {
+        if (languages.de) dbParts.push(...BOM_DE);
+        if (languages.en) dbParts.push(...BOM_EN);
+    }
+    if (books.ot && languages.en) dbParts.push(...OT_EN);
+    if (books.nt && languages.en) dbParts.push(...NT_EN);
+
+    if (!dbParts.length) {
+        dbParts.push(...BOM_DE);
+    }
+
+    DB = dbParts;
+}
+
+function populateSettingsControls() {
+    uiLanguageInputs.forEach((input) => {
+        input.checked = input.value === userSettings.uiLanguage;
+    });
+
+    bookCheckboxes.bom.checked = !!userSettings.content.books.bom;
+    bookCheckboxes.ot.checked = !!userSettings.content.books.ot;
+    bookCheckboxes.nt.checked = !!userSettings.content.books.nt;
+
+    languageCheckboxes.de.checked = !!userSettings.content.languages.de;
+    languageCheckboxes.en.checked = !!userSettings.content.languages.en;
+}
+
+function saveSettingsToStorage() {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(userSettings));
+}
+
+function openSettings() {
+    populateSettingsControls();
+    settingsOverlay.classList.add('open');
+}
+
+function closeSettings() {
+    settingsOverlay.classList.remove('open');
+}
+
+function saveSettings() {
+    const selectedLanguage = [...uiLanguageInputs].find((input) => input.checked)?.value || 'de';
+    userSettings.uiLanguage = selectedLanguage;
+
+    userSettings.content.books = {
+        bom: bookCheckboxes.bom.checked,
+        ot: bookCheckboxes.ot.checked,
+        nt: bookCheckboxes.nt.checked,
+    };
+
+    userSettings.content.languages = {
+        de: languageCheckboxes.de.checked,
+        en: languageCheckboxes.en.checked,
+    };
+
+    saveSettingsToStorage();
+    updateUILanguage();
+    rebuildDatabase();
+    closeSettings();
 }
 
 window.addEventListener('resize', initCanvas);
@@ -213,6 +385,9 @@ requestAnimationFrame(drawParticles);
 
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 
+updateUILanguage();
+rebuildDatabase();
+
 document.getElementById('btn-reset').addEventListener('click', resetOverlay);
 document.getElementById('btn-open').addEventListener('click', openSelection);
 
@@ -220,3 +395,10 @@ orb.addEventListener('pointerdown', onDown);
 window.addEventListener('pointermove', onMove);
 window.addEventListener('pointerup', onUp);
 window.addEventListener('pointercancel', onUp);
+
+settingsToggle.addEventListener('click', openSettings);
+settingsClose.addEventListener('click', closeSettings);
+settingsOverlay.addEventListener('click', (event) => {
+    if (event.target === settingsOverlay) closeSettings();
+});
+saveSettingsBtn.addEventListener('click', saveSettings);

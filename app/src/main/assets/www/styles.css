@@ -62,6 +62,15 @@ body {
     pointer-events: none;
 }
 
+.top-bar {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    max-width: 520px;
+}
+
 .header-title {
     font-family: 'Noto Serif', 'Cinzel', serif;
     letter-spacing: 0.3em;
@@ -71,6 +80,32 @@ body {
     text-transform: uppercase;
     margin-top: 20px;
     z-index: 10;
+}
+
+.settings-button,
+.icon-button {
+    border: 1px solid var(--gold-primary);
+    background: transparent;
+    color: var(--gold-primary);
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 1.05rem;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    min-width: 44px;
+    min-height: 44px;
+}
+
+.settings-button:active,
+.icon-button:active {
+    background: var(--gold-primary);
+    color: var(--bg-color);
+}
+
+.settings-button span {
+    line-height: 1;
 }
 
 .liahona-wrapper {
@@ -198,6 +233,11 @@ body {
     cursor: pointer;
 }
 
+.btn-gold.full-width {
+    width: 100%;
+    justify-content: center;
+}
+
 .orb-core,
 button,
 .btn-reset {
@@ -206,6 +246,102 @@ button,
 
 .footer-space {
     height: 24px;
+}
+
+.settings-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+    z-index: 200;
+}
+
+.settings-overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.settings-panel {
+    background: var(--overlay-bg);
+    color: var(--text-main);
+    width: min(520px, 100%);
+    max-height: calc(100vh - 48px);
+    overflow: auto;
+    border-radius: 16px;
+    padding: 18px 18px 22px;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    touch-action: auto;
+}
+
+.settings-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.settings-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+}
+
+.settings-section {
+    margin-top: 16px;
+    padding: 12px 10px;
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--overlay-bg) 90%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ring-color) 60%, transparent);
+}
+
+.section-label {
+    font-weight: 700;
+    margin-bottom: 10px;
+}
+
+.option-subtitle {
+    font-size: 0.9rem;
+    color: var(--text-dim);
+    margin: 8px 0 6px;
+}
+
+.option-group {
+    display: grid;
+    gap: 10px;
+}
+
+.option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 500;
+}
+
+.option input {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--gold-primary);
+    touch-action: auto;
+}
+
+.settings-panel::-webkit-scrollbar {
+    width: 8px;
+}
+
+.settings-panel::-webkit-scrollbar-thumb {
+    background: var(--ring-color);
+    border-radius: 999px;
 }
 
 @media (max-height: 700px) {
