@@ -1,0 +1,126 @@
+name: Build Offline Edition
+
+on:
+  # Runs manually from the Actions tab
+  workflow_dispatch:
+  # Runs automatically on every push to main
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build-single-file:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Bundle HTML (Python Script)
+        run: |
+          python3 -c "
+          import os
+          import re
+          import base64
+
+          # --- Configuration ---
+          # Paths relative to the repository root
+          BASE_DIR = 'app/src/main/assets/www'
+          OUTPUT_FILE = 'liahona-offline.html'
+          
+          HTML_FILE = os.path.join(BASE_DIR, 'index.html')
+          CSS_FILE = os.path.join(BASE_DIR, 'styles.css')
+          JS_APP_FILE = os.path.join(BASE_DIR, 'app.js')
+          ICON_FILE = os.path.join(BASE_DIR, 'icons/icon.svg')
+          
+          # List of data files to include
+          DATA_FILES = [
+              'data/bom-de.js',
+              'data/bom-en.js',
+              'data/nt-en.js',
+              'data/ot-en.js'
+          ]
+
+          def read_file(path):
+              if not os.path.exists(path):
+                  print(f'Warning: File not found: {path}')
+                  return ''
+              with open(path, 'r', encoding='utf-8') as f:
+                  return f.read()
+
+          def get_base64_icon(path):
+              if not os.path.exists(path):
+                  return ''
+              with open(path, 'rb') as f:
+                  data = f.read()
+                  encoded = base64.b64encode(data).decode('utf-8')
+                  return f'data:image/svg+xml;base64,{encoded}'
+
+          print('Starting build process...')
+
+          # 1. Read HTML
+          html_content = read_file(HTML_FILE)
+
+          # 2. Inline CSS
+          # Replaces <link rel='stylesheet' href='./styles.css'>
+          css_content = read_file(CSS_FILE)
+          html_content = re.sub(
+              r'<link rel=\"stylesheet\" href=\"\./styles\.css\">',
+              f'<style>\\n{css_content}\\n</style>',
+              html_content
+          )
+
+          # 3. Bundle JavaScript (Data + App Logic)
+          combined_js = '// OFF-LINE BUILD AUTOMATED \\n\\n'
+
+          # Process data files (remove exports)
+          for data_rel_path in DATA_FILES:
+              full_path = os.path.join(BASE_DIR, data_rel_path)
+              content = read_file(full_path)
+              # Make variables global by removing 'export const'
+              content = content.replace('export const', 'const')
+              combined_js += f'// Source: {data_rel_path}\\n{content}\\n\\n'
+
+          # Process App Logic (remove imports)
+          app_content = read_file(JS_APP_FILE)
+          app_content = re.sub(r'import .* from .*;', '', app_content)
+          combined_js += f'// Source: app.js\\n{app_content}'
+
+          # Inject JS into HTML
+          # Replaces <script type='module' src='./app.js'></script>
+          html_content = re.sub(
+              r'<script type=\"module\" src=\"\./app\.js\"></script>',
+              f'<script>\\n{combined_js}\\n</script>',
+              html_content
+          )
+
+          # 4. Inline Icon (Favicon)
+          icon_data = get_base64_icon(ICON_FILE)
+          if icon_data:
+              html_content = re.sub(
+                  r'<link rel=\"icon\" type=\"image/svg\+xml\" href=\"\./icons/icon\.svg\">',
+                  f'<link rel=\"icon\" type=\"image/svg+xml\" href=\"{icon_data}\">',
+                  html_content
+              )
+
+          # 5. Remove Manifest Link (not needed for single file)
+          html_content = html_content.replace('<link rel=\"manifest\" href=\"./manifest.webmanifest\">', '')
+
+          # 6. Write Output
+          with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
+              f.write(html_content)
+          
+          print(f'Build complete: {OUTPUT_FILE}')
+          "
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Liahona-Offline-HTML
+          path: liahona-offline.html
